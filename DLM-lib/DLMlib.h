@@ -15,6 +15,9 @@
 #define EWRITE -4
 #define EREAD -5
 
+#define DLM_PATH "/tmp/DLM/"
+#define DLM_FIFO_PATH "/tmp/DLM/DLMfifo"
+
 typedef struct DLMrequest {
 	pid_t pid;
 	int resource_id;

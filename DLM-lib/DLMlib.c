@@ -8,9 +8,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#define DLM_PATH "/tmp/DLM/"
-#define DLM_FIFO_PATH "/tmp/DLM/DLMfifo"
-
 int DLM_lock(int resource_id, int lock_type, long timeout) {
 	DLMrequest request = { getpid(), resource_id, lock_type, timeout };
 	DLMresponse response;
