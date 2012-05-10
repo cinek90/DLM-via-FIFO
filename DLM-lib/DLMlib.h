@@ -7,8 +7,20 @@
 
 #include <unistd.h>
 
+/* lock types */
+#define CR	0
+#define CW	1
+#define PR	2
+#define PW	3
+#define EX	4
 #define FREERESOURCE -1
 
+/* respones */
+#define GRANTED	0
+#define TIMEDOUT	1
+#define AGAIN	2
+
+/* errors */
 #define EOPENDLMFIFO -1
 #define ECREATEFIFO -2
 #define EOPENCLIENTFIFO -3

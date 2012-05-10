@@ -23,7 +23,7 @@ int DLM_lock(int resource_id, int lock_type, long timeout) {
 		close(dlmfifo);
 		return ECREATEFIFO;
 	}
-	if ((clientfifo = open(path, O_RDONLY))) {
+	if ((clientfifo = open(path, O_RDONLY | O_NDELAY))) {
 		close(dlmfifo);
 		unlink(path);
 		return EOPENCLIENTFIFO;
