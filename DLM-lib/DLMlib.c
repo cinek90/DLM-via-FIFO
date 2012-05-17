@@ -19,16 +19,16 @@ int DLM_lock(int resource_id, int lock_type, long timeout) {
 	if ((dlmfifo = open(DLM_FIFO_PATH, O_WRONLY)) < 0) {
 		return EOPENDLMFIFO;
 	}
-	if (mkfifo(path, S_IRUSR | S_IWUSR) < 0) {
+	if (mkfifo(path, 00666) < 0) {
 		close(dlmfifo);
 		return ECREATEFIFO;
 	}
-	if ((clientfifo = open(path, O_RDONLY | O_NDELAY))) {
+	if ((clientfifo = open(path, O_RDWR)) < 0) {
 		close(dlmfifo);
 		unlink(path);
 		return EOPENCLIENTFIFO;
 	}
-	if (write(dlmfifo, &request, sizeof(request)) != sizeof(request) ) {
+	if (write(dlmfifo, &request, sizeof(request)) != sizeof(request)) {
 		close(dlmfifo);
 		close(clientfifo);
 		unlink(path);
@@ -47,21 +47,21 @@ int DLM_lock(int resource_id, int lock_type, long timeout) {
 	return response.response;
 }
 
-int DLM_unlock( int resource_id ) {
+int DLM_unlock(int resource_id) {
 	DLMrequest request = { getpid(), resource_id, FREERESOURCE, 0 };
 	int dlmfifo;
 
 	if ((dlmfifo = open(DLM_FIFO_PATH, O_WRONLY)) < 0) {
 		return EOPENDLMFIFO;
 	}
-	if (write(dlmfifo, &request, sizeof(request)) != sizeof(request) ) {
+	if (write(dlmfifo, &request, sizeof(request)) != sizeof(request)) {
 		close(dlmfifo);
 		return EWRITE;
 	}
 	close(dlmfifo);
-	return 0;
+	return REQSENT;
 }
 
-int DLM_trylock( int resource_id, int lock_type ) {
+int DLM_trylock(int resource_id, int lock_type) {
 	return DLM_lock(resource_id, lock_type, -1);
 }

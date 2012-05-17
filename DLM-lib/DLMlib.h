@@ -6,6 +6,7 @@
 #define DLMLIB_H_
 
 #include <unistd.h>
+#include <sys/types.h>
 
 /* lock types */
 #define CR	0
@@ -15,12 +16,12 @@
 #define EX	4
 #define FREERESOURCE -1
 
-/* respones */
+/* responses */
 #define GRANTED	0
 #define TIMEDOUT	1
 #define AGAIN	2
-
-/* errors */
+#define LOCKED	3
+#define REQSENT	4
 #define EOPENDLMFIFO -1
 #define ECREATEFIFO -2
 #define EOPENCLIENTFIFO -3
@@ -42,7 +43,7 @@ typedef struct DLMresponse {
 } DLMresponse;
 
 int DLM_lock(int resource_id, int lock_type, long timeout);
-int DLM_unlock( int resource_id );
-int DLM_trylock( int resource_id, int lock_type );
+int DLM_unlock(int resource_id);
+int DLM_trylock(int resource_id, int lock_type);
 
 #endif /* DLMLIB_H_ */
