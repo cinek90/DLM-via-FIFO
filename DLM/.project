@@ -3,7 +3,6 @@
 	<name>DLM</name>
 	<comment></comment>
 	<projects>
-		<project>DLM-lib</project>
 	</projects>
 	<buildSpec>
 		<buildCommand>
