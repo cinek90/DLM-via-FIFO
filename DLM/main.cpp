@@ -12,9 +12,11 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/param.h>
+#include <sys/ioctl.h>
 #include <signal.h>
 
 #include <iostream>
+#include <cstring>
 #include <map>
 
 using namespace std;
@@ -121,24 +123,106 @@ void try_grant(map<int, resource_clients>::iterator iter) {
 	}
 }
 
-int main() {
+/*
+ * Opcje programu:
+ * -d - uruchamia w trybie demona
+ * -l <nazwa_pliku> - logowanie do pliku
+ * -h wyswietla pomoc programu
+ */
+int main(int argc, char* argv[]) {
+	int c;
+	bool daemon = false;
+	bool log = false;
+	char *log_filename = NULL;
+
+	while (argc != 1 && (c = getopt(argc, argv, "hdl:")) != -1) {
+		switch (c) {
+		case 'd':
+			daemon = true;
+			break;
+		case 'l':
+			log = true;
+			log_filename = optarg;
+			break;
+		default:
+			cout << "Opcje programu:" << endl;
+			cout << "-d - uruchamia w trybie demona" << endl;
+			cout << "-l <nazwa_pliku> - logowanie do pliku" << endl;
+			cout << "-h wyswietla pomoc programu" << endl;
+			exit(EXIT_FAILURE);
+			break;
+		}
+	}
+
+	if (daemon && !log) {
+		cerr << "Nie mozna uzyc DLM w trybie demona bez opcji logowania" << endl;
+		exit(EXIT_FAILURE);
+	}
+
+	// logging
+	int fd;
+	if (log) {
+		if ((fd = open(log_filename, O_WRONLY | O_CREAT)) < 0) {
+			cerr << "Nie moge otworzyc pliku do logowania o nazwie: " << log_filename << endl;
+			exit(EXIT_FAILURE);
+		}
+	}
+
+	// demon
+	if (daemon) {
+		// zamkniecie deskryptorow cin cout cerr
+		for (int i = 0; i < 3; ++i)
+			close(i);
+
+		// zmiana katalogu na katalog glowny
+		chdir("/");
+
+		// zerowanie maski trybu dostepu
+		umask(0);
+
+		// przejscie do pracy drugoplanowej
+		if (0 != fork()) {
+			exit(EXIT_SUCCESS);
+		}
+
+		// odlaczanie sie od grupy
+		setpgrp();
+
+		// ignorowanie sygnalow terminala
+#ifdef SIGTTOU	/* SIGTTIN, SIDTSTP */
+		signal(SIGTTOU, SIG_IGN);
+#endif
+
+		// odlaczenie sie od terminala
+		int fdesc;
+		if ((fdesc = open("/dev/tty", O_RDWR)) >= 0) {
+			ioctl(fdesc, TIOCNOTTY, (char*) 0);
+			close (fdesc);
+		}
+	}
+
+	// logging
+	if (log) {
+		dup2(fd, 1);	// fd -> stdout
+		dup2(fd, 2);	// fd -> stderr
+	}
+
 	int dlmfifo;
 	if (mkdir(DLM_PATH, 00777) != 0) {
 		if (errno != EEXIST) {
-			fprintf(stderr, "Nie moge utworzyc katalogu %s\n", DLM_PATH);
+			cerr << "Nie moge utworzyc katalogu o nazwie: " << DLM_PATH << endl;
 			return EXIT_FAILURE;
 		}
 	}
 	if (mkfifo(DLM_FIFO_PATH, 00666) < 0) {
 		if (errno != EEXIST) {
-			fprintf(stderr, "Nie moge utworzyc kolejki fifo %s\n",
-					DLM_FIFO_PATH);
+			cerr << "Nie moge utworzyc kolejki fifo o nazwie: " << DLM_FIFO_PATH << endl;
 			return EXIT_FAILURE;
 		}
 	}
 	if ((dlmfifo = open(DLM_FIFO_PATH, O_RDWR)) < 0) {
+		cerr << "Nie moge otworzyc kolejki fifo o nazwie: " << DLM_FIFO_PATH << endl;
 		unlink(DLM_FIFO_PATH);
-		fprintf(stderr, "Nie moge otworzyc kolejki FIFO %s\n", DLM_FIFO_PATH);
 		return EXIT_FAILURE;
 	}
 
@@ -213,16 +297,16 @@ int main() {
 									iter->second.active_clients.begin();
 									i != iter->second.active_clients.end();
 									++i) {
-								if (!lock_matrix[request.lock_type][i->lock_type]) {	// jesli blokada koliduje z zalozona blokada
+								if (!lock_matrix[request.lock_type][i->lock_type]) { // jesli blokada koliduje z zalozona blokada
 									collision = true;
 									break;
 								}
 							}
-							if (!collision) {	// przydzielamy zasob
+							if (!collision) { // przydzielamy zasob
 								std::cout << "przydzielamy zasob" << std::endl;
 								iter->second.active_clients.push_back(c);
 								send_response(c.pid, GRANTED);
-							} else {	// nie przydzielamy zasobu
+							} else { // nie przydzielamy zasobu
 								send_response(c.pid, LOCKED);
 							}
 						} else { // nieujemny timeout
