@@ -63,5 +63,5 @@ int DLM_unlock(int resource_id) {
 }
 
 int DLM_trylock(int resource_id, int lock_type) {
-	return DLM_lock(resource_id, lock_type, -1);
+	return DLM_lock(resource_id, lock_type, -2);
 }

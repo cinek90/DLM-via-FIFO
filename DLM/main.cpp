@@ -303,8 +303,10 @@ int main(int argc, char* argv[]) {
 								}
 							}
 							if (!collision) { // przydzielamy zasob
-								std::cout << "przydzielamy zasob" << std::endl;
-								iter->second.active_clients.push_back(c);
+								if(request.timeout!=-2) { // funkcja trylock nie przydziela zasobu
+									std::cout << "przydzielamy zasob" << std::endl;
+									iter->second.active_clients.push_back(c);
+								}
 								send_response(c.pid, GRANTED);
 							} else { // nie przydzielamy zasobu
 								send_response(c.pid, LOCKED);
@@ -339,11 +341,13 @@ int main(int argc, char* argv[]) {
 				}
 			} else { // nie znaleziono zasobu
 				cout << "zasob jeszcze nie istnieje" << endl;
-				// stworz id zasobu i przydziel zasob
-				client c(request.pid, request.lock_type);
-				resource_clients rc;
-				rc.active_clients.push_back(c);
-				resource_map[request.resource_id] = rc;
+				if(request.timeout!=-2) { //funkcja try_lock nie przydziela zasobu
+					// stworz id zasobu i przydziel zasob
+					client c(request.pid, request.lock_type);
+					resource_clients rc;
+					rc.active_clients.push_back(c);
+					resource_map[request.resource_id] = rc;
+				}
 				// wyslanie odpowiedzi
 				send_response(request.pid, GRANTED);
 			}
