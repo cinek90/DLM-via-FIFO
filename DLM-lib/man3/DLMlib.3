@@ -1,0 +1,76 @@
+.TH DLMlib 3
+.SH NAZWA
+DLMlib \- biblioteka implementuje interfejs do DLM
+.SH SKŁADNIA
+.B #include <DLMlib.h>
+.sp
+.BI "int DLM_lock(int " resource_id ", int " lock_type ", long " timeout ");
+.br
+.BI "int DLM_unlock(int " resource_id ");
+.br
+.BI "int DLM_trylock(int " resource_id ", int " lock_type ");
+.SH 
+OPIS
+Biblioteka zawiera funckje synchronizujące dostęp do zasobów. Aby funkcje 
+działały najpierw należy uruchomić program DLM. Funkcje komunikują się 
+z programem DLM poprzez nazwane kolejki FIFO. Kolejki znajdują się w 
+katalgu /tmp/DLM. 
+.SH
+Funkcje
+.BI "int DLM_lock(int " resource_id ", int " lock_type ", long " timeout ");
+.br
+Funkcja zakłada blokade na zasób.
+.br
+.BI "int DLM_unlock(int " resource_id ");
+.br
+Funkcja zwalnia blokadę z zasobu o identyfikatorze podanym w argumencie funkcji.
+.br
+.BI "int DLM_trylock(int " resource_id ", int " lock_type ");
+.br
+Funkcja sprawdza czy może żalożyć blokadę, ale jej nie zakłada;
+.SH
+Argumenty
+.I resource_id
+- identyfikator zasobu, na który chcemy założyć blokade. Identyfikatorem może być to dowolna liczba typu int.
+.br
+.I timeout 
+- czas w milisekundach po którym, w przypadku niemożności założenia blokady na zasób, funkcja odblokowuje się. Wartość 0 oznacza nieskończony czas oczekiwania. Wartość -1 oznacza tryb bez blokowania.
+.br
+.I lock_type
+- typ blokady jaki chcemy założyć na zasób. Wyróżniamy następujące typy:
+.nf
+        0 - concurrent read(CR)
+        1 - concurrent write(CW)
+        2 - protected read(PR)
+        3 - protected write(PW)
+        4 - exclusive (EX)
+.fi
+.br
+Możliwe jednoczesne występowanie blokad przedstawia poniższa tabela:
+.nf
+   CR  CW  PR  PW  EX
+CR T   T   T   T   N
+CW T   T   N   N   N
+PR T   N   T   N   N
+PW T   N   N   N   N
+EX N   N   N   N   N
+.fi
+T - Blokady mogą występować jednocześnie.
+N - Blokada nie mogą występować jednocześnie.
+.SH Zwracane wartości
+Funkcje mogą zwracać następujące wartości:
+.nf
+GRANTED  0 - Udało się przydzielić zasób.
+TIMEDOUT 1 - Wystąpił timeout.
+AGAIN  2 - Proces założył już wcześniej blokadę na ten zasób.
+LOCKED 3 - Nie udało się założyć blokady na zasób(dla timeout=-1).
+REQSENT 4 - Wiadomość dla DLM została wysłana(dla DLM_unlock).
+EOPENDLMFIFO -1 - Błąd przy otwieraniu kolejki FIFO do DLM.
+ECREATEFIFO -2 - Błąd przy tworzeniu kolejki FIFO.
+EOPENCLIENTFIFO -3 - Bład przy otwieraniu kolejki FIFO.
+EWRITE -4 - Błąd zapisu do kolejki FIFO.
+EREAD -5 - Błąd odczytu z kolejki FIFO.
+.fi
+
+.SH "ZOBACZ RÓWNIEŻ"
+.BR DLM-client (1)
