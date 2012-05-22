@@ -8,14 +8,16 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-int DLM_lock(int resource_id, int lock_type, long timeout) {
-	DLMrequest request = { getpid(), resource_id, lock_type, timeout };
+/* special lock types */
+#define FREERESOURCE -1
+
+int send_request(DLMrequest* request) {
 	DLMresponse response;
 	int dlmfifo;
 	int clientfifo;
 	char path[32];
 
-	sprintf(path, "%s%d", DLM_PATH, request.pid);
+	sprintf(path, "%s%d", DLM_PATH, request->pid);
 	if ((dlmfifo = open(DLM_FIFO_PATH, O_WRONLY)) < 0) {
 		return EOPENDLMFIFO;
 	}
@@ -28,7 +30,7 @@ int DLM_lock(int resource_id, int lock_type, long timeout) {
 		unlink(path);
 		return EOPENCLIENTFIFO;
 	}
-	if (write(dlmfifo, &request, sizeof(request)) != sizeof(request)) {
+	if (write(dlmfifo, request, sizeof(*request)) != sizeof(*request)) {
 		close(dlmfifo);
 		close(clientfifo);
 		unlink(path);
@@ -47,21 +49,26 @@ int DLM_lock(int resource_id, int lock_type, long timeout) {
 	return response.response;
 }
 
+int DLM_lock(int resource_id, int lock_type, long timeout) {
+	if (lock_type < 0 || lock_type > 4) {
+		return EBADLOCKTYPE;
+	}
+	if (timeout < -2) {
+		return EBADTIMEOUT;
+	}
+	DLMrequest request = { getpid(), resource_id, lock_type, timeout };
+	return send_request(&request);
+}
+
 int DLM_unlock(int resource_id) {
 	DLMrequest request = { getpid(), resource_id, FREERESOURCE, 0 };
-	int dlmfifo;
-
-	if ((dlmfifo = open(DLM_FIFO_PATH, O_WRONLY)) < 0) {
-		return EOPENDLMFIFO;
-	}
-	if (write(dlmfifo, &request, sizeof(request)) != sizeof(request)) {
-		close(dlmfifo);
-		return EWRITE;
-	}
-	close(dlmfifo);
-	return REQSENT;
+	return send_request(&request);
 }
 
 int DLM_trylock(int resource_id, int lock_type) {
-	return DLM_lock(resource_id, lock_type, -2);
+	if (lock_type < 0 || lock_type > 4) {
+		return EBADLOCKTYPE;
+	}
+	DLMrequest request = { getpid(), resource_id, lock_type, TRYLOCK };
+	return send_request(&request);
 }

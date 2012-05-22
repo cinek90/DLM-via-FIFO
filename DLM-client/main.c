@@ -24,16 +24,15 @@ int main(int argc, char *argv[]) {
 	int resource_id, lock_type, sleep_time, i;
 	long timeout;
 	char* lock_types[] = { "CR", "CW", "PR", "PW", "EX" };
-	char* responses[] =
-			{ "EREAD", "EWRITE", "EOPENCLIENTFIFO", "ECREATEFIFO",
-					"EOPENDLMFIFO", "GRANTED", "TIMEDOUT", "AGAIN", "LOCKED",
-					"REQSENT" };
+	char* responses[] = { "EAGAIN", "ENOTLOCKED", "EBADTIMEOUT", "EBADLOCKTYPE",
+			"EREAD", "EWRITE", "EOPENCLIENTFIFO", "ECREATEFIFO", "EOPENDLMFIFO",
+			"GRANTED", "TIMEDOUT", "LOCKED", "UNLOCKED", "FREE" };
 
 	if (argc != 6) {
 		printf("Sposob uzycia:\n"
 				"arg1 - numer zasobu\n"
 				"arg2 - typ blokady\n"
-				"arg3 - timeout\n"
+				"arg3 - timeout (w milisekundach)\n"
 				"arg4 - czas uspienia (w sekundach)\n"
 				"arg5 - liczba iteracji\n");
 		exit(EXIT_FAILURE);
@@ -53,8 +52,8 @@ int main(int argc, char *argv[]) {
 				pid, resource_id, lock_types[lock_type], timeout);
 		// lock
 		lock_response = DLM_lock(resource_id, lock_type, timeout);
-		printf("%d: %s, resource_id: %d, lock_type: %s, timeout: %ld\n",
-				pid, responses[lock_response + 5], resource_id,
+		printf("%d: %s, resource_id: %d, lock_type: %s, timeout: %ld\n", pid,
+				responses[lock_response + 9], resource_id,
 				lock_types[lock_type], timeout);
 
 		// sleep
@@ -65,8 +64,8 @@ int main(int argc, char *argv[]) {
 				pid, resource_id, lock_types[lock_type], timeout);
 		// unlock
 		unlock_response = DLM_unlock(resource_id);
-		printf("%d: %s, resource_id: %d, lock_type: %s, timeout: %ld\n",
-				pid, responses[unlock_response + 5], resource_id,
+		printf("%d: %s, resource_id: %d, lock_type: %s, timeout: %ld\n", pid,
+				responses[unlock_response + 9], resource_id,
 				lock_types[lock_type], timeout);
 		--i;
 	}

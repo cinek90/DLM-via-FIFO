@@ -155,15 +155,17 @@ int main(int argc, char* argv[]) {
 	}
 
 	if (daemon && !log) {
-		cerr << "Nie mozna uzyc DLM w trybie demona bez opcji logowania" << endl;
+		cerr << "Nie mozna uzyc DLM w trybie demona bez opcji logowania"
+				<< endl;
 		exit(EXIT_FAILURE);
 	}
 
 	// logging
 	int fd;
 	if (log) {
-		if ((fd = open(log_filename, O_WRONLY | O_CREAT)) < 0) {
-			cerr << "Nie moge otworzyc pliku do logowania o nazwie: " << log_filename << endl;
+		if ((fd = open(log_filename, O_WRONLY | O_CREAT | O_APPEND)) < 0) {
+			cerr << "Nie moge otworzyc pliku do logowania o nazwie: "
+					<< log_filename << endl;
 			exit(EXIT_FAILURE);
 		}
 	}
@@ -197,14 +199,14 @@ int main(int argc, char* argv[]) {
 		int fdesc;
 		if ((fdesc = open("/dev/tty", O_RDWR)) >= 0) {
 			ioctl(fdesc, TIOCNOTTY, (char*) 0);
-			close (fdesc);
+			close(fdesc);
 		}
 	}
 
 	// logging
 	if (log) {
-		dup2(fd, 1);	// fd -> stdout
-		dup2(fd, 2);	// fd -> stderr
+		dup2(fd, 1); // fd -> stdout
+		dup2(fd, 2); // fd -> stderr
 	}
 
 	int dlmfifo;
@@ -242,7 +244,7 @@ int main(int argc, char* argv[]) {
 		sigprocmask(SIG_BLOCK, &toblock, NULL);
 		map<int, resource_clients>::iterator iter = resource_map.find(
 				request.resource_id);
-		if (request.lock_type == FREERESOURCE) { // zwalnianie zasobu
+		if (request.lock_type == -1) { // zwalnianie zasobu
 			cout << "żądanie zwolnienia zasobu" << endl;
 			if (iter != resource_map.end()) { // znaleziono zasob
 				list<client>::iterator ret = find_by_pid(
@@ -251,6 +253,7 @@ int main(int argc, char* argv[]) {
 				if (ret != iter->second.active_clients.end()) { // znaleziono pid w aktywnych
 					cout << "znaleziono pid w aktywnych" << endl;
 					iter->second.active_clients.erase(ret); // usuniecie klienta z aktywnych (zwolnienie zasobu)
+					send_response(request.pid, UNLOCKED);
 					try_grant(iter); // proba przydzielenia zasobu
 				} else { // nie znaleziono pidu w aktywnych
 					ret = find_by_pid(iter->second.waiting_clients,
@@ -260,11 +263,14 @@ int main(int argc, char* argv[]) {
 						iter->second.waiting_clients.erase(ret); // usuniecie klienta z oczekujacych
 						erase_from_timestamp_map(request.pid,
 								request.resource_id); // usuniecie klienta z kolejki timeout
+						send_response(request.pid, UNLOCKED);
+						try_grant(iter); // proba przydzielenia zasobu
 					} else { // nie znaleziono pidu w oczekujacych
 						cout
 								<< "nie znaleziono pidu ani w aktywnych ani w oczekujacych"
 								<< endl;
-						// nic do zrobienia - ktos zwalnia cos czego nie zajal
+						// ktos zwalnia cos czego nie zajal
+						send_response(request.pid, ENOTLOCKED);
 					}
 				}
 				if (iter->second.waiting_clients.empty()
@@ -274,7 +280,8 @@ int main(int argc, char* argv[]) {
 				}
 			} else { // nie znaleziono zasobu
 				cout << "nie znaleziono zasobu" << endl;
-				// nic do zrobienia - ktos zwalnia cos czego nie zajal i to cos nie istnieje wogole
+				// ktos zwalnia cos czego nie zajal i to cos nie istnieje wogole
+				send_response(request.pid, ENOTLOCKED);
 			}
 		} else { // przydzielanie zasobu
 			cout << "żądanie przydzielenia zasobu" << endl;
@@ -303,11 +310,14 @@ int main(int argc, char* argv[]) {
 								}
 							}
 							if (!collision) { // przydzielamy zasob
-								if(request.timeout!=-2) { // funkcja trylock nie przydziela zasobu
-									std::cout << "przydzielamy zasob" << std::endl;
+								if (request.timeout != -2) { // funkcja trylock nie przydziela zasobu
+									std::cout << "przydzielamy zasob"
+											<< std::endl;
 									iter->second.active_clients.push_back(c);
+									send_response(c.pid, GRANTED);
+								} else {
+									send_response(c.pid, FREE);
 								}
-								send_response(c.pid, GRANTED);
 							} else { // nie przydzielamy zasobu
 								send_response(c.pid, LOCKED);
 							}
@@ -333,23 +343,24 @@ int main(int argc, char* argv[]) {
 						}
 					} else { // znaleziono pid w oczekujacych
 						cout << "znaleziono pid w oczekujacych" << endl;
-						send_response(request.pid, AGAIN);
+						send_response(request.pid, EAGAIN);
 					}
 				} else { // znaleziono pid w aktywnych
 					cout << "znaleziono pid w aktywnych" << endl;
-					send_response(request.pid, AGAIN);
+					send_response(request.pid, EAGAIN);
 				}
 			} else { // nie znaleziono zasobu
 				cout << "zasob jeszcze nie istnieje" << endl;
-				if(request.timeout!=-2) { //funkcja try_lock nie przydziela zasobu
+				if (request.timeout != -2) { //funkcja try_lock nie przydziela zasobu
 					// stworz id zasobu i przydziel zasob
 					client c(request.pid, request.lock_type);
 					resource_clients rc;
 					rc.active_clients.push_back(c);
 					resource_map[request.resource_id] = rc;
+					send_response(c.pid, GRANTED);
+				} else {
+					send_response(request.pid, FREE);
 				}
-				// wyslanie odpowiedzi
-				send_response(request.pid, GRANTED);
 			}
 		}
 		// koniec sekcji krytycznej
