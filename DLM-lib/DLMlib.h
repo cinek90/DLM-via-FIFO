@@ -1,5 +1,6 @@
 /*
- * DLMlib.h
+ * Interfejs do DLM
+ * Autorzy: Marek Jasiński, Marcin Cieślikowski, Paweł Goździkowski
  */
 
 #ifndef DLMLIB_H_

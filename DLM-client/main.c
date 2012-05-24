@@ -1,5 +1,6 @@
 /*
- * main.c
+ * Przykladowy klient DLM wykorzystywany do testow
+ * Autorzy: Marek Jasiński, Marcin Cieślikowski, Paweł Goździkowski
  */
 
 #include <DLMlib.h>

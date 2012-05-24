@@ -1,5 +1,6 @@
 /*
- * DLM.hpp
+ * Struktury wykorzystywane przez DLM
+ * Autorzy: Marek Jasiński, Marcin Cieślikowski, Paweł Goździkowski
  */
 
 #ifndef DLM_HPP_

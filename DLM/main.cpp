@@ -1,5 +1,6 @@
 /*
- * main.cpp
+ * DLM - Distributed Lock Manager
+ * Autorzy: Marek Jasiński, Marcin Cieślikowski, Paweł Goździkowski
  */
 
 #include "DLM.hpp"
@@ -8,12 +9,12 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <stdlib.h>
+#include <signal.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/param.h>
 #include <sys/ioctl.h>
-#include <signal.h>
 
 #include <iostream>
 #include <cstring>
@@ -32,6 +33,7 @@ int send_response(pid_t pid, int response);
 void try_grant(map<int, resource_clients>::iterator iter);
 
 void close_event(int) {
+	cout << "DLM exit" << endl;
 	for (int i = 0; i < NOFILE; ++i)
 		close(i);
 	unlink(DLM_FIFO_PATH);
@@ -39,7 +41,7 @@ void close_event(int) {
 }
 
 void timeout_alarm(int) {
-	cout << "timeout alarm" << endl;
+	cout << "!timeout alarm" << endl;
 	struct timeval tv;
 	struct timezone tz;
 	multimap<long, client_timeout>::iterator i;
@@ -55,7 +57,6 @@ void timeout_alarm(int) {
 		list<client>::iterator k = find_by_pid(j->second.waiting_clients,
 				i->second.pid);
 		j->second.waiting_clients.erase(k); // usuniecie klienta z kolejki oczekujacych
-		cout << "usuniecie oczekujacego klienta" << endl;
 		send_response(i->second.pid, TIMEDOUT);
 		timestamp_map.erase(i++); // usuniecie klienta z kolejki timeout
 		try_grant(j); // proba przydzielenia zasobu
@@ -64,6 +65,7 @@ void timeout_alarm(int) {
 		useconds_t alrm = (i->first - ts) * 1000;
 		ualarm(alrm, 0);
 	}
+	cout << "!end of timeout alarm" << endl;
 }
 
 void erase_from_timestamp_map(pid_t pid, int resource_id) {
@@ -88,6 +90,55 @@ list<client>::iterator find_by_pid(list<client>& clients, pid_t pid) {
 }
 
 int send_response(pid_t pid, int response) {
+	cout << "wyslanie ";
+	switch (response) {
+	case EAGAIN:
+		cout << "EAGAIN";
+		break;
+	case ENOTLOCKED:
+		cout << "ENOTLOCKED";
+		break;
+	case EBADTIMEOUT:
+		cout << "EBADTIMEOUT";
+		break;
+	case EBADLOCKTYPE:
+		cout << "EBADLOCKTYPE";
+		break;
+	case EREAD:
+		cout << "EREAD";
+		break;
+	case EWRITE:
+		cout << "EWRITE";
+		break;
+	case EOPENCLIENTFIFO:
+		cout << "EOPENCLIENTFIFO";
+		break;
+	case ECREATEFIFO:
+		cout << "ECREATEFIFO";
+		break;
+	case EOPENDLMFIFO:
+		cout << "EOPENDLMFIFO";
+		break;
+	case FREE:
+		cout << "FREE";
+		break;
+	case UNLOCKED:
+		cout << "UNLOCKED";
+		break;
+	case LOCKED:
+		cout << "LOCKED";
+		break;
+	case TIMEDOUT:
+		cout << "TIMEDOUT";
+		break;
+	case GRANTED:
+		cout << "GRANTED";
+		break;
+	default:
+		cout << "UNKNOWN_RESPONSE";
+		break;
+	}
+	cout << " do klienta o pid: " << pid << endl;
 	DLMresponse resp;
 	resp.response = response;
 	int clientfifo;
@@ -114,7 +165,6 @@ void try_grant(map<int, resource_clients>::iterator iter) {
 			if (!lock_matrix[lt][i->lock_type]) // jesli blokada koliduje z zalozona blokada
 				return; // to nie przydzielamy zasobu
 		}
-		std::cout << "przydzielamy zasob" << std::endl;
 		client c = iter->second.waiting_clients.front();
 		iter->second.waiting_clients.pop_front();
 		erase_from_timestamp_map(c.pid, iter->first);
@@ -240,34 +290,35 @@ int main(int argc, char* argv[]) {
 		DLMrequest request;
 		while (read(dlmfifo, &request, sizeof(request)) != sizeof(request))
 			;
+		cout << "żądanie od pid: " << request.pid << endl;
 		//sekcja krytyczna
 		sigprocmask(SIG_BLOCK, &toblock, NULL);
 		map<int, resource_clients>::iterator iter = resource_map.find(
 				request.resource_id);
 		if (request.lock_type == -1) { // zwalnianie zasobu
-			cout << "żądanie zwolnienia zasobu" << endl;
+			cout << "-żądanie zwolnienia zasobu" << endl;
 			if (iter != resource_map.end()) { // znaleziono zasob
 				list<client>::iterator ret = find_by_pid(
 						iter->second.active_clients, request.pid);
-				cout << "znaleziono zasob" << endl;
+				cout << "--znaleziono zasob" << endl;
 				if (ret != iter->second.active_clients.end()) { // znaleziono pid w aktywnych
-					cout << "znaleziono pid w aktywnych" << endl;
+					cout << "---znaleziono pid w aktywnych" << endl;
 					iter->second.active_clients.erase(ret); // usuniecie klienta z aktywnych (zwolnienie zasobu)
 					send_response(request.pid, UNLOCKED);
 					try_grant(iter); // proba przydzielenia zasobu
 				} else { // nie znaleziono pidu w aktywnych
+					cout << "---nie znaleziono pidu w aktywnych" << endl;
 					ret = find_by_pid(iter->second.waiting_clients,
 							request.pid);
 					if (ret != iter->second.waiting_clients.end()) { // znaleziono pid w oczekujacych
-						cout << "znaleziono pid w oczekujacych" << endl;
+						cout << "----znaleziono pid w oczekujacych" << endl;
 						iter->second.waiting_clients.erase(ret); // usuniecie klienta z oczekujacych
 						erase_from_timestamp_map(request.pid,
 								request.resource_id); // usuniecie klienta z kolejki timeout
 						send_response(request.pid, UNLOCKED);
 						try_grant(iter); // proba przydzielenia zasobu
 					} else { // nie znaleziono pidu w oczekujacych
-						cout
-								<< "nie znaleziono pidu ani w aktywnych ani w oczekujacych"
+						cout << "----nie znaleziono pidu w oczekujacych"
 								<< endl;
 						// ktos zwalnia cos czego nie zajal
 						send_response(request.pid, ENOTLOCKED);
@@ -275,27 +326,28 @@ int main(int argc, char* argv[]) {
 				}
 				if (iter->second.waiting_clients.empty()
 						&& iter->second.active_clients.empty()) { // usuniecie nieuzywanego zasobu
-					cout << "usuniecie nieuzywanego zasobu" << endl;
+					cout << "usuniecie nieuzywanego zasobu resource_id: " << iter->first << endl;
 					resource_map.erase(iter);
 				}
 			} else { // nie znaleziono zasobu
-				cout << "nie znaleziono zasobu" << endl;
+				cout << "--nie znaleziono zasobu" << endl;
 				// ktos zwalnia cos czego nie zajal i to cos nie istnieje wogole
 				send_response(request.pid, ENOTLOCKED);
 			}
 		} else { // przydzielanie zasobu
-			cout << "żądanie przydzielenia zasobu" << endl;
+			cout << "-żądanie przydzielenia zasobu" << endl;
 			if (iter != resource_map.end()) { // znaleziono zasob
-				cout << "zasob juz istnieje" << endl;
+				cout << "--zasob juz istnieje" << endl;
 				// sprawdzenie czy klient nie oczekuje juz na zasob lub z niego korzysta
 				list<client>::iterator ret = find_by_pid(
 						iter->second.active_clients, request.pid);
 				if (ret == iter->second.active_clients.end()) { // nie znaleziono pidu w aktywnych
-					cout << "nie znaleziono pidu w aktywnych" << endl;
+					cout << "---nie znaleziono pidu w aktywnych" << endl;
 					ret = find_by_pid(iter->second.waiting_clients,
 							request.pid);
 					if (ret == iter->second.waiting_clients.end()) { // nie znaleziono pidu w oczekujacych
-						cout << "nie znaleziono pidu w oczekujacych" << endl;
+						cout << "----nie znaleziono pidu w oczekujacych"
+								<< endl;
 						client c(request.pid, request.lock_type);
 						if (request.timeout < 0) { // ujemny timeout
 							// sprawdzic, czy mozna przydzielic i od razu wyslac odpowiedz
@@ -311,8 +363,6 @@ int main(int argc, char* argv[]) {
 							}
 							if (!collision) { // przydzielamy zasob
 								if (request.timeout != -2) { // funkcja trylock nie przydziela zasobu
-									std::cout << "przydzielamy zasob"
-											<< std::endl;
 									iter->second.active_clients.push_back(c);
 									send_response(c.pid, GRANTED);
 								} else {
@@ -342,15 +392,15 @@ int main(int argc, char* argv[]) {
 							try_grant(iter); // proba przydzielenia zasobu
 						}
 					} else { // znaleziono pid w oczekujacych
-						cout << "znaleziono pid w oczekujacych" << endl;
+						cout << "----znaleziono pid w oczekujacych" << endl;
 						send_response(request.pid, EAGAIN);
 					}
 				} else { // znaleziono pid w aktywnych
-					cout << "znaleziono pid w aktywnych" << endl;
+					cout << "---znaleziono pid w aktywnych" << endl;
 					send_response(request.pid, EAGAIN);
 				}
 			} else { // nie znaleziono zasobu
-				cout << "zasob jeszcze nie istnieje" << endl;
+				cout << "--zasob jeszcze nie istnieje" << endl;
 				if (request.timeout != -2) { //funkcja try_lock nie przydziela zasobu
 					// stworz id zasobu i przydziel zasob
 					client c(request.pid, request.lock_type);

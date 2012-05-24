@@ -1,5 +1,6 @@
 /*
- * DLMlib.c
+ * Implementacja interfejsu do DLM
+ * Autorzy: Marek Jasiński, Marcin Cieślikowski, Paweł Goździkowski
  */
 
 #include "DLMlib.h"
