@@ -1,12 +1,11 @@
 #!/bin/bash
 cd ../bin
 # resource_id lock_type timeout(ms) sleep_time(s) iterations
-echo "testowanie funkcji try_lock testcase3"
-./DLM-client 100 1 0 5 3 &
+./DLM-client 100 3 600 5 3 &
 arr[0]=$!
-./DLM-client 100 4 -2 4 2 &
+./DLM-client 100 3 600 5 3 &
 arr[1]=$!
 for pid in $arr
 do
-        wait $pid
+	wait $pid
 done
