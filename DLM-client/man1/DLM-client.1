@@ -31,11 +31,16 @@ Wyróżniamy następujące typy blokad:
 	3 - protected write(PW)
 	4 - exclusive (EX)
 .fi
+.TP
 .B timeout
 Czas w milisekundach po którym, w przypadku niemożności założenia blokady na zasób, program zacznie wykonywać następne instrukcje. Wartość 0 oznacza nieskończony czas oczekiwania. Wartość -1 oznacza tryb bez blokowania,
 -2 wykorzystuje funkcje try_lock, sprawdza czy może założyć blokade, ale jej nie zakłada.
+.br
+.TP
 .B czas uspienia
 Czas uśpienia programu po wykonaniu funkcji zakładajacej blokade na zasób(bez znaczenia czy funkcja założyła czy nie blokade).
+.br
+.TP
 .B liczba iteracji
 Liczba wykonań pętli w której program próbuje założyć blokadę na zasób.
 
