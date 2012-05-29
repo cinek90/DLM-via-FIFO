@@ -1,0 +1,37 @@
+.\" Autorzy Marcin Cieślikowski Paweł Goździkowski Marek Jasiński
+.TH DLM 1 "" "" "wersja 1.0"
+.SH NAZW
+Program DLM (Distributed Lock Manager) \- zarządca blokad
+.SH SKŁADNIA
+.B DLM
+.R [-d]
+.R [-l plikdologowania]
+.br
+.SH OPIS
+Celem 
+.I DLM 
+jest synchronizacja dostępu do współdzielonych zasobów. Aby bezpiecznie korzystać z zasobu
+należy założyć na niego blokadę. Jeżeli założenie blokady nie jest możliwe proces żądający
+blokady zostaje zawieszony do czasu aż wystąpi timeout lub blokada będzie mogła być
+przez niego uzyskana.
+
+.SH OPCJE
+.TP
+.B -d
+Opcja ta powoduje, że program uruchamia się w trybie deamona. Użycie tej opcji wymaga ustawienia pliku do logowania za pomocą opcji 
+.I -l
+.TP
+.B -l plikdologowania
+Opcja ta ustawia plik do, którego zostają zapisane logi programu DLM.
+.TP
+.B -h
+Wyświetla pomoc programu.
+.SH KOLEJKI FIFO
+Pogram tworzy kolejkę FIFO o nazwie DLM w katalogu /tmp/DLM. Z tej kolejki program odczytuje komunikaty od klientów. Następnie program odpowiada klientom do stworzonych przez nich kolejek FIFO.
+Klienci również tworzą kolejki w katalogu /tmp/DLM i nazywają je swoim PIDem.
+.SH SPOSÓB UŻYCIA
+Aby użyć DLM do synchronizacji należy wykorzystać bibliotekę DLMlib. Biblioteka ta zawiera interfejs do komunikacji z DLM.
+
+.SH "ZOBACZ RÓWNIEŻ"
+.BR DLMlib(3),
+.BR DLM-client(1)
